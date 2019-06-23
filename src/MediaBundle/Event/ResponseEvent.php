@@ -3,16 +3,19 @@
 namespace Opifer\MediaBundle\Event;
 
 use Symfony\Component\EventDispatcher\Event;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * @deprecated
+ */
 class ResponseEvent extends Event
 {
     private $response;
     private $request;
 
     /**
-     * Constructor
+     * Constructor.
      *
      * @param Request $request
      */
@@ -22,7 +25,7 @@ class ResponseEvent extends Event
     }
 
     /**
-     * Get the request
+     * Get the request.
      *
      * @return Request
      */
@@ -32,7 +35,7 @@ class ResponseEvent extends Event
     }
 
     /**
-     * Set the response
+     * Set the response.
      *
      * @param Response $response
      */

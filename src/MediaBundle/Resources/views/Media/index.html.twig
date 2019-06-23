@@ -1,0 +1,9 @@
+{% extends '@OpiferMedia/base.html.twig' %}
+
+{% block opifer_media_title %}
+  {{ 'title.media'|trans }}
+{% endblock opifer_media_title %}
+
+{% block opifer_media_body %}
+  <media-library :providers="{{ providers|json_encode }}"/>
+{% endblock opifer_media_body %}

@@ -5,9 +5,9 @@ opifer_media_media_index:
     options:
         expose: true
 
-opifer_media_media_new:
-    path: /media/new/{provider}
-    defaults: { _controller: OpiferMediaBundle:Backend/Media:new }
+opifer_media_media_create:
+    path: /media/create/{provider}
+    defaults: { _controller: OpiferMediaBundle:Backend/Media:create }
     options:
         expose: true
 
@@ -19,10 +19,6 @@ opifer_media_media_edit:
     options:
         expose: true
 
-opifer_media_media_updateall:
-    path: /media/update/all
-    defaults: { _controller: OpiferMediaBundle:Backend/Media:updateAll }
-
 opifer_media_media_delete:
     path: /media/delete/{id}
     defaults: { _controller: OpiferMediaBundle:Backend/Media:delete }
@@ -32,6 +28,13 @@ opifer_media_media_delete:
         expose: true
 
 # API
+
+opifer_media_api_update:
+    path: /api/media/update
+    defaults: { _controller: OpiferMediaBundle:Api/Media:update }
+    methods: [PUT]
+    options:
+        expose: true
 
 opifer_api_media:
     path: /api/media

@@ -2,45 +2,48 @@
 
 namespace Opifer\MediaBundle\Controller\Api;
 
-use JMS\Serializer\SerializationContext;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-use Opifer\MediaBundle\Event\MediaResponseEvent;
-use Opifer\MediaBundle\Event\ResponseEvent;
-use Opifer\MediaBundle\OpiferMediaEvents;
-
 class MediaController extends Controller
 {
     /**
-     * Index
+     * Index.
+     *
+     * @param Request $request
      *
      * @return JsonResponse
      */
     public function indexAction(Request $request)
     {
-        $dispatcher = $this->get('event_dispatcher');
-        $event = new ResponseEvent($request);
-        $dispatcher->dispatch(OpiferMediaEvents::MEDIA_CONTROLLER_INDEX, $event);
-
-        if (null !== $event->getResponse()) {
-            return $event->getResponse();
-        }
+        $this->denyAccessUnlessGranted('ROLE_MEDIA_INDEX');
 
         $media = $this->get('opifer.media.media_manager')->getPaginatedByRequest($request);
 
-        $items = $this->get('jms_serializer')->serialize(iterator_to_array($media->getCurrentPageResults()), 'json', SerializationContext::create()->setGroups(['Default', 'list']));
-
-        return new JsonResponse([
-            'results'          => json_decode($items, true),
+        $response = [
+            'results'          => iterator_to_array($media->getCurrentPageResults()),
             'total_results'    => $media->getNbResults(),
-            'results_per_page' => $media->getMaxPerPage()
-        ]);
+            'results_per_page' => $media->getMaxPerPage(),
+            'max_upload_size'  => $this->determineMaxUploadSize(),
+        ];
+
+        $json = $this->get('jms_serializer')->serialize($response, 'json');
+
+        return JsonResponse::fromJsonString($json);
     }
+
+    private function determineMaxUploadSize() {
+        if (ini_get('post_max_size') < ini_get('upload_max_filesize')) {
+            return ini_get('post_max_size');
+        }
+
+        return ini_get('upload_max_filesize');
+    }
+
     /**
-     * Detail
+     * Detail.
      *
      * @return JsonResponse
      */
@@ -48,28 +51,30 @@ class MediaController extends Controller
     {
         $media = $this->get('opifer.media.media_manager')->getRepository()->find($id);
 
-        $media = $this->get('jms_serializer')->serialize($media, 'json', SerializationContext::create()->setGroups(['Default', 'detail']));
+        $json = $this->get('jms_serializer')->serialize($media, 'json');
 
-        return new JsonResponse(json_decode($media, true));
+        return JsonResponse::fromJsonString($json);
     }
 
     /**
-     * Upload
+     * Upload.
      *
      * @return Response
      */
     public function uploadAction(Request $request)
     {
-        $media = $this->get('opifer.media.media_manager')->createMedia();
+        $mediaManager = $this->get('opifer.media.media_manager');
+
         $em = $this->getDoctrine()->getManager();
 
+        $newMedia = [];
         foreach ($request->files->all() as $files) {
             if ((!is_array($files)) && (!$files instanceof \Traversable)) {
                 $files = [$files];
             }
 
             foreach ($files as $file) {
-                $media = clone $media;
+                $media = $mediaManager->createMedia();
                 $media->setFile($file);
 
                 if (strpos($file->getClientMimeType(), 'image') !== false) {
@@ -78,41 +83,38 @@ class MediaController extends Controller
                     $media->setProvider('file');
                 }
 
+                $newMedia[] = $media;
+
                 $em->persist($media);
             }
         }
         $em->flush();
 
-        $media = $this->get('jms_serializer')->serialize($media, 'json');
+        $json = $this->get('jms_serializer')->serialize($newMedia, 'json');
 
-        return new Response($media, 200, ['Content-Type' => 'application/json']);
+        return JsonResponse::fromJsonString($json);
     }
 
     /**
-     * Delete
+     * Delete.
      *
-     * @param  Request $request
-     * @param  integer $id
+     * @param Request $request
+     * @param int     $id
      *
      * @return JsonResponse
      */
     public function deleteAction(Request $request, $id)
     {
+        $this->denyAccessUnlessGranted('MEDIA_DELETE');
+
         try {
             $mediaManager = $this->get('opifer.media.media_manager');
+
             $media = $mediaManager->getRepository()->find($id);
-
-            $dispatcher = $this->get('event_dispatcher');
-            $event = new MediaResponseEvent($media, $request);
-            $dispatcher->dispatch(OpiferMediaEvents::MEDIA_CONTROLLER_DELETE, $event);
-
-            if (null !== $event->getResponse()) {
-                return $event->getResponse();
-            }
 
             $mediaManager->remove($media);
         } catch (\Exception $e) {
-            return new JsonResponse(['success' => false, 'message' => $e->getMessage()]);
+            return new JsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
 
         return new JsonResponse(['success' => true]);

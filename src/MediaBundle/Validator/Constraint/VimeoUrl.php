@@ -7,15 +7,15 @@ use Symfony\Component\Validator\Constraint;
 /**
  * @Annotation
  */
-class YoutubeUrl extends Constraint
+class VimeoUrl extends Constraint
 {
-    public $message = '"%string%" is not a valid Youtube URL';
+    public $message = '"%string%" is not a valid Vimeo URL';
 
     /**
      * {@inheritdoc}
      */
     public function validatedBy()
     {
-        return 'Opifer\MediaBundle\Validator\YoutubeUrlValidator';
+        return 'Opifer\MediaBundle\Validator\VimeoUrlValidator';
     }
 }

@@ -2,7 +2,8 @@
 
 namespace Opifer\MediaBundle\Tests\Provider;
 
-use \Mockery as m;
+use Mockery as m;
+use Opifer\MediaBundle\Form\Type\DropzoneType;
 use Opifer\MediaBundle\Provider\FileProvider;
 
 class FileProviderTest extends \PHPUnit_Framework_TestCase
@@ -18,10 +19,9 @@ class FileProviderTest extends \PHPUnit_Framework_TestCase
         $this->filesystem = m::mock('Gaufrette\FileSystem');
         $this->translator = m::mock('Symfony\Component\Translation\TranslatorInterface');
         $this->media = m::mock('Opifer\MediaBundle\Tests\Media');
-        $this->router = m::mock('Symfony\Component\Routing\RouterInterface');
         $this->urlGenerator = m::mock('Opifer\MediaBundle\Routing\UrlGenerator');
 
-        $this->provider = new FileProvider($this->filesystem, $this->translator, $this->router, $this->urlGenerator);
+        $this->provider = new FileProvider($this->filesystem, $this->translator, $this->urlGenerator);
     }
 
     public function testFormHasDropzoneField()
@@ -29,11 +29,11 @@ class FileProviderTest extends \PHPUnit_Framework_TestCase
         $this->router->shouldReceive('generate')->andReturn('/generated/path');
 
         $builder = m::mock('Symfony\Component\Form\FormBuilderInterface');
-        $builder->shouldReceive('add')->with('files', 'dropzone', [
+        $builder->shouldReceive('add')->with('files', DropzoneType::class, [
             'mapped' => false,
             'path' => '/generated/path',
             'form_action' => '/generated/path',
-            'label' => ''
+            'label' => '',
         ]);
 
         $this->provider->buildCreateForm($builder, array());
@@ -67,17 +67,16 @@ class FileProviderTest extends \PHPUnit_Framework_TestCase
             'getStatus' => 1,
             'getName' => 'Testname',
         ));
-        
+
         $this->filesystem->shouldReceive([
             'listKeys' => ['keys' => [
                 'testimage.png',
                 'testimage-1.png',
-                'testiamge-3.png'
-            ]]
+                'testiamge-3.png',
+            ]],
         ]);
 
         $this->provider->prePersist($this->media);
-        
     }
 
     public function testPostRemoveDeletesFile()
@@ -101,13 +100,16 @@ class FileProviderTest extends \PHPUnit_Framework_TestCase
     public function testUploadFile()
     {
         $file = m::mock('Symfony\Component\HttpFoundation\File\UploadedFile');
-        $file->shouldReceive('__toString')->andReturn(__DIR__ . '/../testfile.txt');
+        $file->shouldReceive([
+            '__toString' => __DIR__.'/../testfile.txt',
+            'isValid' => true,
+        ]);
 
-        $this->media->shouldReceive(array(
+        $this->media->shouldReceive([
             'getFile' => $file,
             'getReference' => 'filename.jpg',
-            'setFile' => $this->media
-        ));
+            'setFile' => $this->media,
+        ]);
         $this->filesystem->shouldReceive('getAdapter');
         $this->filesystem->shouldReceive('write')->with('filename.jpg', 'content');
 
@@ -128,15 +130,15 @@ class FileProviderTest extends \PHPUnit_Framework_TestCase
         $file->shouldReceive([
             'guessExtension' => 'png',
             'getClientOriginalName' => 'testimage.png',
-            'getClientOriginalExtension' => 'png'
+            'getClientOriginalExtension' => 'png',
         ]);
 
         $this->filesystem->shouldReceive([
             'listKeys' => ['keys' => [
                 'testimage.png',
                 'testimage-1.png',
-                'testiamge-3.png'
-            ]]
+                'testiamge-3.png',
+            ]],
         ]);
 
         $filename = $this->provider->createUniqueFileName($file);

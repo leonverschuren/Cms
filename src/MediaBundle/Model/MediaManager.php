@@ -2,70 +2,67 @@
 
 namespace Opifer\MediaBundle\Model;
 
-use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\ORM\EntityManager;
 use Pagerfanta\Adapter\DoctrineORMAdapter;
 use Pagerfanta\Pagerfanta;
 use Symfony\Component\HttpFoundation\Request;
 
 class MediaManager implements MediaManagerInterface
 {
-    protected $objectManager;
+    protected $em;
     protected $class;
-    protected $repository;
 
     /**
-     * Constructor
+     * Constructor.
      *
-     * @param ObjectManager $om
+     * @param EntityManager $em
      * @param string        $class
      */
-    public function __construct(ObjectManager $om, $class)
+    public function __construct(EntityManager $em, $class)
     {
-        $this->objectManager = $om;
+        $this->em = $em;
         $this->class = $class;
-        $this->repository = $om->getRepository($class);
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function createMedia()
     {
         $class = $this->getClass();
-        $media = new $class;
+        $media = new $class();
 
         return $media;
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function save(MediaInterface $media)
     {
-        $this->objectManager->persist($media);
-        $this->objectManager->flush();
+        $this->em->persist($media);
+        $this->em->flush();
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function remove(MediaInterface $media)
     {
-        $this->objectManager->remove($media);
-        $this->objectManager->flush();
+        $this->em->remove($media);
+        $this->em->flush();
     }
 
     /**
-     * Get paginated media items by request
+     * Get paginated media items by request.
      *
-     * @param  Request $request
+     * @param Request $request
      *
      * @return Pagerfanta
      */
     public function getPaginatedByRequest(Request $request)
     {
         $qb = $this->getRepository()->createQueryBuilderFromRequest($request);
-
         $paginator = new Pagerfanta(new DoctrineORMAdapter($qb));
         $paginator->setMaxPerPage($request->get('limit', 50));
         $paginator->setCurrentPage($request->get('page', 1));
@@ -74,7 +71,7 @@ class MediaManager implements MediaManagerInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function getClass()
     {
@@ -82,10 +79,10 @@ class MediaManager implements MediaManagerInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function getRepository()
     {
-        return $this->repository;
+        return $this->em->getRepository($this->class);
     }
 }

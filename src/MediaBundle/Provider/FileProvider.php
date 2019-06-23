@@ -4,12 +4,14 @@ namespace Opifer\MediaBundle\Provider;
 
 use Gaufrette\Adapter\AwsS3;
 use Gaufrette\FileSystem;
-use Opifer\MediaBundle\Routing\UrlGenerator;
-use Symfony\Component\Translation\TranslatorInterface;
-use Symfony\Component\Form\FormBuilderInterface;
-use Symfony\Component\Routing\RouterInterface;
-
+use Opifer\MediaBundle\Form\Type\DropzoneType;
 use Opifer\MediaBundle\Model\MediaInterface;
+use Opifer\MediaBundle\Routing\UrlGenerator;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\HttpFoundation\File\Exception\FileException;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\Translation\TranslatorInterface;
 
 class FileProvider extends AbstractProvider
 {
@@ -19,23 +21,18 @@ class FileProvider extends AbstractProvider
     /** @var TranslatorInterface */
     protected $translator;
 
-    /** @var RouterInterface */
-    protected $router;
-
     /** @var UrlGenerator  */
     protected $urlGenerator;
 
     /**
      * @param FileSystem          $filesystem
      * @param TranslatorInterface $translator
-     * @param RouterInterface     $router
      * @param UrlGenerator        $urlGenerator
      */
-    public function __construct(FileSystem $filesystem, TranslatorInterface $translator, RouterInterface $router, UrlGenerator $urlGenerator)
+    public function __construct(FileSystem $filesystem, TranslatorInterface $translator, UrlGenerator $urlGenerator)
     {
         $this->filesystem = $filesystem;
         $this->translator = $translator;
-        $this->router = $router;
         $this->urlGenerator = $urlGenerator;
     }
 
@@ -47,41 +44,22 @@ class FileProvider extends AbstractProvider
     /**
      * {@inheritdoc}
      */
-    public function newView()
-    {
-        return 'OpiferMediaBundle:File:new.html.twig';
-    }
-
-    /**
-     * Build the add file form
-     *
-     * @param FormBuilderInterface $builder
-     * @param array $options
-     *
-     * @return void
-     */
     public function buildCreateForm(FormBuilderInterface $builder, array $options)
     {
         $builder
-            ->add('files', 'dropzone', [
-                'mapped' => false,
-                'path' => $this->router->generate('opifer_api_media_upload'),
-                'form_action' => $this->router->generate('opifer_media_media_updateall'),
-                'label' => ''
-            ])
+            ->add('files', DropzoneType::class)
         ;
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function buildEditForm(FormBuilderInterface $builder, array $options)
     {
         $builder
-            ->add('name', null, [
-                'label' => ucfirst($this->translator->trans('file.name.label'))
+            ->add('name', TextType::class, [
+                'label' => 'file.name.label',
             ])
-            ->add('Update', 'submit')
         ;
     }
 
@@ -94,7 +72,7 @@ class FileProvider extends AbstractProvider
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function prePersist(MediaInterface $media)
     {
@@ -118,7 +96,7 @@ class FileProvider extends AbstractProvider
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function postPersist(MediaInterface $media)
     {
@@ -126,7 +104,7 @@ class FileProvider extends AbstractProvider
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function postUpdate(MediaInterface $media)
     {
@@ -134,7 +112,7 @@ class FileProvider extends AbstractProvider
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function postRemove(MediaInterface $media)
     {
@@ -144,11 +122,9 @@ class FileProvider extends AbstractProvider
     }
 
     /**
-     * Upload a file
+     * Upload a file.
      *
      * @param MediaInterface $media
-     *
-     * @return void
      */
     public function upload(MediaInterface $media)
     {
@@ -156,13 +132,20 @@ class FileProvider extends AbstractProvider
         if (null === $media->getFile()) {
             return;
         }
-        
-        $adapter = $this->filesystem->getAdapter();
-        
-        if ($adapter instanceof AwsS3) {
-            $adapter->setMetadata($media->getReference(), ['ContentType' => $media->getContentType()] );
+
+        if ($media->getFile() instanceof UploadedFile && !$media->getFile()->isValid()) {
+            $this->handleError($media->getFile()->getError());
         }
-        
+
+        $adapter = $this->filesystem->getAdapter();
+
+        if ($adapter instanceof AwsS3) {
+            $adapter->setMetadata($media->getReference(), [
+                'ContentType' => $media->getContentType(),
+                'Cache-Control' => 'max-age=86400',
+            ]);
+        }
+
         $this->filesystem->write($media->getReference(), file_get_contents($media->getFile()));
 
         if (isset($media->temp)) {
@@ -177,14 +160,50 @@ class FileProvider extends AbstractProvider
     }
 
     /**
-     * Get the full url to the original file
+     * @param string $error
+     *
+     * @throws FileException When an error occurred during the file upload process
+     */
+    public function handleError($error)
+    {
+        switch($error) {
+            case UPLOAD_ERR_INI_SIZE:
+                throw new FileException('The uploaded file exceeds the upload_max_filesize directive in php.ini');
+            case UPLOAD_ERR_FORM_SIZE:
+                throw new FileException('The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form');
+            case UPLOAD_ERR_PARTIAL:
+                throw new FileException('The uploaded file was only partially uploaded');
+            case UPLOAD_ERR_NO_TMP_DIR:
+                throw new FileException('Missing a temporary folder');
+            case UPLOAD_ERR_CANT_WRITE:
+                throw new FileException('Failed to write file to disk');
+            case UPLOAD_ERR_EXTENSION:
+                throw new FileException('A PHP extension stopped the file upload. PHP does not provide a way to ascertain which extension caused the file upload to stop; examining the list of loaded extensions with phpinfo() may help');
+            default:
+                return;
+        }
+    }
+
+    /**
+     * Get the full url to the original file.
      *
      * @param MediaInterface $media
+     *
      * @return string
      */
     public function getUrl(MediaInterface $media)
     {
-        return $this->urlGenerator->generate($media->getReference());
+        return $this->getUrlByReference($media->getReference());
+    }
+
+    /**
+     * @param string $reference
+     *
+     * @return string
+     */
+    public function getUrlByReference($reference)
+    {
+        return $this->urlGenerator->generate($reference);
     }
 
     /**
@@ -200,11 +219,11 @@ class FileProvider extends AbstractProvider
      */
     public function createUniqueFileName($file)
     {
-        $ext = '.' . $file->guessExtension();
+        $ext = '.'.$file->getClientOriginalExtension();
         $basename = trim(str_replace('.'.$file->getClientOriginalExtension(), '', $file->getClientOriginalName()));
         $basename = str_replace(' ', '-', $basename);
-        $basename = strtolower($basename);
-        
+        $basename = urlencode(strtolower($basename));
+
         $existing = $this->filesystem->listKeys($basename);
         if (isset($existing['keys'])) {
             $existing = $existing['keys'];
@@ -221,16 +240,16 @@ class FileProvider extends AbstractProvider
 
             rsort($ids);
             $id = reset($ids);
-            $id++;
+            ++$id;
 
-            $basename = $basename . '-' . $id;
+            $basename = $basename.'-'.$id;
         }
 
-        return $basename . $ext;
+        return strtolower($basename.$ext);
     }
 
     /**
-     * Get Filesystem
+     * Get Filesystem.
      *
      * @return FileSystem
      */

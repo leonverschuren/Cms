@@ -5,11 +5,11 @@ namespace Opifer\MediaBundle\Validator;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 
-class YoutubeUrlValidator extends ConstraintValidator
+class VimeoUrlValidator extends ConstraintValidator
 {
     public function validate($value, Constraint $constraint)
     {
-        $regex = '/(?<=v(\=|\/))([-a-zA-Z0-9_]+)|(?<=youtu\.be\/)([-a-zA-Z0-9_]+)/';
+        $regex = '/https?:\/\/(?:www\.|player\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/';
 
         if (!preg_match($regex, $value, $matches)) {
             $this->context->addViolation($constraint->message, ['%string%' => $value]);

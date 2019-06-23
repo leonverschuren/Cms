@@ -1,13 +1,27 @@
 file:
+    singular: file
+    plural: files
     label: file
     new: upload new %provider%
     name:
         label: name
 
+title:
+    media: Media
+
+button:
+    add_youtube: Add YouTube
+    add_vimeo: Add Vimeo
+    submit: submit
+
 image:
+    singular: image
+    plural: images
     label: image
 
 media:
+    singular: media
+    plural: media
     edit: edit %name%
     new: add new %provider%
     no_preview: no preview
@@ -19,13 +33,16 @@ media:
         button: Update file data
         success: "Your uploads have been saved. Optionally you could change the name or add some tags below."
 
-imagefilter:
-    new: new imagefilter
-
-tag:
-    help_text: "Type the tagnames and separate them with a comma. E.g. Red, Green, Blue"
-
 youtube:
     label: youtube video
     reference:
         label: Youtube URL
+    name: Video name
+    helper: You can enter a name for the video here, default this will be the video title used on Youtube
+
+vimeo:
+    label: Vimeo video
+    reference:
+        label: Vimeo URL
+    name: Video name
+    helper: You can enter a name for the video here, default this will be the video title used on Vimeo

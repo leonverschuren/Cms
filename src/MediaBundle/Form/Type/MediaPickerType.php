@@ -2,64 +2,39 @@
 
 namespace Opifer\MediaBundle\Form\Type;
 
-use Doctrine\Common\Persistence\ManagerRegistry;
-use Opifer\MediaBundle\Provider\Pool;
+use Opifer\MediaBundle\Model\MediaManagerInterface;
+use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\FormInterface;
-use Symfony\Component\Form\FormView;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
-/**
- * Media Picker Form Type
- *
- * Renders a media picker field in a form
- */
 class MediaPickerType extends AbstractType
 {
-    /**
-     * @var  \Opifer\MediaBundle\Provider\Pool
-     */
-    protected $providerPool;
+    /** @var MediaManagerInterface */
+    private $mediaManager;
 
-    /**
-     * Constructor
-     *
-     * @param Pool $providerPool
-     */
-    public function __construct(Pool $providerPool)
+    public function __construct(MediaManagerInterface $mediaManager)
     {
-        $this->providerPool = $providerPool;
+        $this->mediaManager = $mediaManager;
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
-    public function buildView(FormView $view, FormInterface $form, array $options)
+    public function getParent()
     {
-        $view->vars = array_replace($view->vars, [
-            'providers' => $this->providerPool->getProviders()
+        return EntityType::class;
+    }
+
+    public function configureOptions(OptionsResolver $resolver)
+    {
+        $resolver->setDefaults([
+            'class'        => $this->mediaManager->getClass(),
+            'choice_label' => 'name',
         ]);
     }
 
     /**
-     * {@inheritDoc}
-     */
-    public function getParent()
-    {
-        return 'entity';
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated
-     */
-    public function getName()
-    {
-        return $this->getBlockPrefix();
-    }
-
-    /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function getBlockPrefix()
     {

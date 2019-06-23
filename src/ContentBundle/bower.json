@@ -1,7 +1,0 @@
-{
-  "name": "opifer-contentbundle",
-  "dependencies": {
-    "angular-inview": "latest",
-    "afkl-lazy-image": "latest"
-  }
-}

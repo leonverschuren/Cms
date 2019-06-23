@@ -31,9 +31,10 @@ class UrlGenerator
     }
 
     /**
-     * Generate the full url to the original uploaded file
+     * Generate the full url to the original uploaded file.
      *
-     * @param  string $reference
+     * @param string $reference
+     *
      * @return string
      */
     public function generate($reference)
@@ -44,7 +45,9 @@ class UrlGenerator
         } elseif ($adapter instanceof Local) {
             $request = $this->getRequest();
 
-            return $request->getSchemeAndHttpHost().'/'.$this->getLocalUploadDirectory().'/'.$reference;
+            $host = ($request) ? $request->getSchemeAndHttpHost() : '';
+
+            return $host.'/'.$this->getLocalUploadDirectory().'/'.$reference;
         }
 
         return $reference;

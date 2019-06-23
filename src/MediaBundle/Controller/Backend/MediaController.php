@@ -2,20 +2,19 @@
 
 namespace Opifer\MediaBundle\Controller\Backend;
 
+use Opifer\MediaBundle\Event\MediaResponseEvent;
+use Opifer\MediaBundle\Event\ResponseEvent;
+use Opifer\MediaBundle\Form\Type\MediaEditType;
+use Opifer\MediaBundle\Form\Type\MediaType;
+use Opifer\MediaBundle\OpiferMediaEvents;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-use Opifer\MediaBundle\Event\MediaResponseEvent;
-use Opifer\MediaBundle\Event\ResponseEvent;
-use Opifer\MediaBundle\Form\Type\MediaType;
-use Opifer\MediaBundle\Form\Type\DropzoneFieldType;
-use Opifer\MediaBundle\OpiferMediaEvents;
-
 class MediaController extends Controller
 {
     /**
-     * Index
+     * Index.
      *
      * @param Request $request
      *
@@ -23,78 +22,92 @@ class MediaController extends Controller
      */
     public function indexAction(Request $request)
     {
+        $this->denyAccessUnlessGranted('ROLE_MEDIA_INDEX');
+
         $dispatcher = $this->get('event_dispatcher');
-        $event = new ResponseEvent($request);
+        $event      = new ResponseEvent($request);
         $dispatcher->dispatch(OpiferMediaEvents::MEDIA_CONTROLLER_INDEX, $event);
 
         if (null !== $event->getResponse()) {
             return $event->getResponse();
         }
 
-        $providers = $this->get('opifer.media.provider.pool')->getProviders();
+        $providers = $this->get('opifer.media.provider.pool')->getAliases();
 
-        return $this->render('OpiferMediaBundle:Base:index.html.twig', [
-            'providers'  => $providers
+        return $this->render('@OpiferMedia/Media/index.html.twig', [
+            'providers' => $providers,
         ]);
     }
 
     /**
-     * New
+     * Create new media.
      *
      * @param Request $request
      * @param string  $provider
      *
      * @return Response
      */
-    public function newAction(Request $request, $provider = 'image')
+    public function createAction(Request $request, $provider = 'image')
     {
+        $this->denyAccessUnlessGranted('ROLE_MEDIA_CREATE');
+
         $dispatcher = $this->get('event_dispatcher');
-        $event = new ResponseEvent($request);
+        $event      = new ResponseEvent($request);
         $dispatcher->dispatch(OpiferMediaEvents::MEDIA_CONTROLLER_NEW, $event);
 
         if (null !== $event->getResponse()) {
             return $event->getResponse();
         }
 
-        $mediaManager = $this->get('opifer.media.media_manager');
+        $mediaManager  = $this->get('opifer.media.media_manager');
         $mediaProvider = $this->get('opifer.media.provider.pool')->getProvider($provider);
 
         $media = $mediaManager->createMedia();
 
-        $form = $this->createForm(new MediaType(), $media, ['provider' => $mediaProvider]);
+        $form = $this->createForm(MediaType::class, $media, ['provider' => $mediaProvider]);
         $form->handleRequest($request);
 
         if ($form->isValid()) {
-            $mediaManager->save($media);
+            if ($form->get('name')->getData()) {
+                $media->setName($form->get('name')->getData());
+            }
 
-            $this->get('session')->getFlashBag()->add('success',
-                $media->getName() . ' was succesfully created'
-            );
+            try {
+                $mediaManager->save($media);
+            } catch (\Exception $e) {
+                $this->addFlash('error', sprintf('%s', $e->getMessage()));
 
-            return $this->redirect($this->generateUrl('opifer_media_media_index'));
+                return $this->redirectToRoute('opifer_media_media_index');
+            }
+
+            $this->addFlash('success', sprintf('%s was succesfully created', $media->getName()));
+
+            return $this->redirectToRoute('opifer_media_media_index');
         }
 
-        return $this->render($mediaProvider->newView(), [
+        return $this->render('@OpiferMedia/Media/create.html.twig', [
             'form'     => $form->createView(),
-            'provider' => $mediaProvider
+            'provider' => $mediaProvider,
         ]);
     }
 
     /**
-     * Edit
+     * Edit.
      *
      * @param Request $request
-     * @param integer $id
+     * @param int     $id
      *
      * @return Response
      */
     public function editAction(Request $request, $id)
     {
+        $this->denyAccessUnlessGranted('ROLE_MEDIA_EDIT');
+
         $mediaManager = $this->get('opifer.media.media_manager');
-        $media = $mediaManager->getRepository()->find($id);
+        $media        = $mediaManager->getRepository()->find($id);
 
         $dispatcher = $this->get('event_dispatcher');
-        $event = new MediaResponseEvent($media, $request);
+        $event      = new MediaResponseEvent($media, $request);
         $dispatcher->dispatch(OpiferMediaEvents::MEDIA_CONTROLLER_EDIT, $event);
 
         if (null !== $event->getResponse()) {
@@ -106,49 +119,49 @@ class MediaController extends Controller
         // Clone the old Media, so we don't perform any useless actions inside the provider
         $media->old = clone $media;
 
-        $form = $this->createForm(new MediaType(), $media, ['provider' => $provider]);
+        $form = $this->createForm(MediaType::class, $media, ['provider' => $provider]);
         $form->handleRequest($request);
 
         if ($form->isValid()) {
             $mediaManager->save($media);
 
-            $this->get('session')->getFlashBag()->add('success',
-                $media->getName() . ' was succesfully updated'
-            );
+            $this->addFlash('success', sprintf('%s was succesfully updated', $media->getName()));
 
-            return $this->redirect($this->generateUrl('opifer_media_media_index'));
+            return $this->redirectToRoute('opifer_media_media_index');
         }
 
-        return $this->render($provider->editView(), [
+        return $this->render('@OpiferMedia/Media/edit.html.twig', [
             'form'  => $form->createView(),
-            'media' => $media
+            'media' => $media,
         ]);
     }
 
     /**
-     * Update all
+     * Update multiple media items.
      *
-     * @param  Request $request
+     * @param Request $request
      *
      * @return Response
      */
     public function updateAllAction(Request $request)
     {
+        $this->denyAccessUnlessGranted('ROLE_MEDIA_EDIT');
+
         $dispatcher = $this->get('event_dispatcher');
-        $event = new ResponseEvent($request);
+        $event      = new ResponseEvent($request);
         $dispatcher->dispatch(OpiferMediaEvents::MEDIA_CONTROLLER_UPDATEALL, $event);
 
         if (null !== $event->getResponse()) {
             return $event->getResponse();
         }
 
-        $em = $this->getDoctrine()->getManager();
+        $em   = $this->getDoctrine()->getManager();
         $form = $request->get('opifer_media_media');
 
         foreach ($form['files'] as $id => $values) {
             $media = $this->get('opifer.media.media_manager')->getRepository()->find($id);
 
-            $form = $this->createForm('opifer_media_edit', $media);
+            $form = $this->createForm(MediaEditType::class, $media);
             $form->submit($values);
 
             if ($form->isValid()) {
@@ -158,26 +171,28 @@ class MediaController extends Controller
 
         $em->flush();
 
-        $this->get('session')->getFlashBag()->add('success', 'The file(s) were added to the media library');
+        $this->addFlash('success', 'The file(s) were added to the media library');
 
-        return $this->redirect($this->generateUrl('opifer_media_media_index'));
+        return $this->redirectToRoute('opifer_media_media_index');
     }
 
     /**
-     * Deletes an image
+     * Deletes a media item.
      *
      * @param Request $request
-     * @param integer $id
+     * @param int     $id
      *
      * @return \Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function deleteAction(Request $request, $id)
     {
+        $this->denyAccessUnlessGranted('ROLE_MEDIA_DELETE');
+
         $mediaManager = $this->get('opifer.media.media_manager');
-        $media = $mediaManager->getRepository()->find($id);
+        $media        = $mediaManager->getRepository()->find($id);
 
         $dispatcher = $this->get('event_dispatcher');
-        $event = new MediaResponseEvent($media, $request);
+        $event      = new MediaResponseEvent($media, $request);
         $dispatcher->dispatch(OpiferMediaEvents::MEDIA_CONTROLLER_DELETE, $event);
 
         if (null !== $event->getResponse()) {
@@ -186,6 +201,6 @@ class MediaController extends Controller
 
         $mediaManager->remove($media);
 
-        return $this->redirect($this->generateUrl('opifer_media_media_index'));
+        return $this->redirectToRoute('opifer_media_media_index');
     }
 }
